@@ -1,0 +1,8 @@
+streamlit
+requests
+python-dotenv
+groq           
+fpdf
+javalang
+numpy
+rouge
