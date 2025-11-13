@@ -56,14 +56,4 @@ streamlit run app.py
 
 ---
 
-## Contributing
-Want to improve **Code-Doctor**? Feel free to fork the repo and submit a pull request!
 
----
-
-## 🔗 License
-This project is licensed under **MIT License**.
-
----
-
-🚀 **Built with ❤️ by Ankan Moh and Hanvik**  
