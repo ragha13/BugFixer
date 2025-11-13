@@ -343,4 +343,4 @@ if st.button("🔍 Fetch & Fix All Issues"):
     else:
         st.warning("⚠️ Please enter a GitHub repository link.")
 
-st.markdown("**🚀 Built with ❤️ by Ankan Moh, Hanvik S and Sanjay Maj.**")
+
