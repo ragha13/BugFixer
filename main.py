@@ -413,7 +413,7 @@ if st.button("🔍 Fetch & Fix All Issues"):
                     #     continue  # Skip this issue if no file path is found
 
                     if not file_path:
-                        st.warning(f"⚠️ No valid file path found for issue {idx+1}. Skipping to the next issue. Raghaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+                        st.warning(f"⚠️ No valid file path found for issue {idx+1}. Skipping to the next issue.")
                         continue  # Skip to the next issue
 
                     st.markdown(f"✅ **Matched File:** `{file_path}`")
