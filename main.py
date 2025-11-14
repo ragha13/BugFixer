@@ -66,25 +66,47 @@ def extract_file_path(issue_body, repo_files):
         print(f"[Sanitized] {extracted_text}")
 
         # ----------------- HANDLE ABSOLUTE URL ---------------------
+        # url_match = re.search(
+        #     r"github\.com/[^/]+/[^/]+/blob/[^/]+/([^\s`'\"#>)]+)",
+        #     extracted_text,
+        # )
+        # if url_match:
+        #     path = url_match.group(1).strip()
+        #     print(f"[Absolute URL Path] {path}")
+
+        #     # Compare normalized
+        #     normalized_repo_files = [f.lower() for f in repo_files]
+        #     if path.lower() in normalized_repo_files:
+        #         idx = normalized_repo_files.index(path.lower())
+        #         return repo_files[idx]
+
+        #     # Fuzzy if needed
+        #     close = difflib.get_close_matches(path.lower(), normalized_repo_files, n=1, cutoff=0.6)
+        #     if close:
+        #         match = next(f for f in repo_files if f.lower() == close[0])
+        #         return match
+
+        # ----------------- HANDLE ABSOLUTE URL ---------------------
         url_match = re.search(
-            r"github\.com/[^/]+/[^/]+/blob/[^/]+/([^\s`'\"#>)]+)",
+            r"github\.com/[^/]+/[^/]+/blob/[^/]+/([^#\?\s]+)",
             extracted_text,
         )
         if url_match:
             path = url_match.group(1).strip()
             print(f"[Absolute URL Path] {path}")
-
-            # Compare normalized
+        
             normalized_repo_files = [f.lower() for f in repo_files]
+        
             if path.lower() in normalized_repo_files:
                 idx = normalized_repo_files.index(path.lower())
                 return repo_files[idx]
-
-            # Fuzzy if needed
+        
+            # Fuzzy match
             close = difflib.get_close_matches(path.lower(), normalized_repo_files, n=1, cutoff=0.6)
             if close:
                 match = next(f for f in repo_files if f.lower() == close[0])
                 return match
+
 
         # ----------------- DIRECT RELATIVE MATCH ---------------------
         normalized_repo_files = [f.lower() for f in repo_files]
