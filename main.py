@@ -26,80 +26,162 @@ if not ANOTHER_LLM_API_KEY:
 
 client = Groq(api_key=GROQ_API_KEY)
 llm_client = Groq(api_key=ANOTHER_LLM_API_KEY) 
-
-
 def extract_file_path(issue_body, repo_files):
-    """Extracts file path from GitHub issue body. Supports absolute URL or relative path."""
+    """Extract a file path mentioned in the GitHub issue using LLM + fuzzy matching."""
     try:
-        
+        # ------------------- LLM CALL --------------------
         response = llm_client.chat.completions.create(
             messages=[
                 {
                     "role": "system",
                     "content": (
-                        "You are an AI that extracts file paths from GitHub issue descriptions. "
-                        "Your task is to find and return the exact GitHub file path or relative file path mentioned. "
-                        "Return only the path part, like 'src/main.py' or 'test/CMakeLists.txt'. If none found, reply 'not there'."
+                        "Extract ONLY the file path from the GitHub issue. "
+                        "Return ONLY the file path such as:\n"
+                        " - src/main.py\n"
+                        " - test/CMakeLists.txt\n"
+                        "If no file path exists, reply exactly: not there"
                     )
                 },
-                {
-                    "role": "user",
-                    "content": f"Extract file path (absolute or relative) from:\n\n{issue_body}"
-                }
+                {"role": "user", "content": issue_body}
             ],
             model="mixtral-8x7b-32768",
         )
-        
+
         extracted_text = response.choices[0].message.content.strip()
         print(f"[LLM Output] {extracted_text}")
 
-        if not extracted_text or not repo_files:
+        # ----------------- EARLY EXIT ---------------------
+        bad_responses = ["not there", "none", "no file", "no path", ""]
+        if extracted_text.lower() in bad_responses:
+            print("[LLM] No file path detected.")
             return None
 
-        github_url_match = re.search(
-            r"https://github\.com/[^/]+/[^/]+/blob/[^/]+/([^\s`'\"#)>\]]+)", extracted_text
+        # -------------- SANITIZE LLM OUTPUT ---------------
+        clean = extracted_text
+        clean = re.sub(r"[`\*\[\]\(\)<>]", "", clean)  # remove markdown junk
+        clean = clean.strip().rstrip(".")  # remove trailing periods
+        clean = clean.replace("\\", "/")  # normalize windows paths
+
+        extracted_text = clean
+        print(f"[Sanitized] {extracted_text}")
+
+        # ----------------- HANDLE ABSOLUTE URL ---------------------
+        url_match = re.search(
+            r"github\.com/[^/]+/[^/]+/blob/[^/]+/([^\s`'\"#>)]+)",
+            extracted_text,
         )
-        if github_url_match:
-            file_path = github_url_match.group(1).strip()
-            normalized_file_path = file_path.lower().strip()
-            normalized_repo_files = [f.lower().strip() for f in repo_files]
+        if url_match:
+            path = url_match.group(1).strip()
+            print(f"[Absolute URL Path] {path}")
 
-            if normalized_file_path in normalized_repo_files:
-                print(f"[✅ Absolute Path Match] {file_path}")
-                return file_path
+            # Compare normalized
+            normalized_repo_files = [f.lower() for f in repo_files]
+            if path.lower() in normalized_repo_files:
+                idx = normalized_repo_files.index(path.lower())
+                return repo_files[idx]
 
-            
-            close_matches = difflib.get_close_matches(
-                normalized_file_path, normalized_repo_files, n=1, cutoff=0.6
-            )
-            if close_matches:
-                best_match_index = normalized_repo_files.index(close_matches[0])
-                print(f"[🔍 Fuzzy Absolute Match] {repo_files[best_match_index]}")
-                return repo_files[best_match_index]
+            # Fuzzy if needed
+            close = difflib.get_close_matches(path.lower(), normalized_repo_files, n=1, cutoff=0.6)
+            if close:
+                match = next(f for f in repo_files if f.lower() == close[0])
+                return match
 
-       
-        relative_path_candidate = extracted_text.strip()
-        normalized_candidate = relative_path_candidate.lower()
-        normalized_repo_files = [f.lower().strip() for f in repo_files]
+        # ----------------- DIRECT RELATIVE MATCH ---------------------
+        normalized_repo_files = [f.lower() for f in repo_files]
 
-        if normalized_candidate in normalized_repo_files:
-            print(f"[✅ Relative Path Match] {relative_path_candidate}")
-            return relative_path_candidate
+        if extracted_text.lower() in normalized_repo_files:
+            idx = normalized_repo_files.index(extracted_text.lower())
+            print(f"[Relative Match] {repo_files[idx]}")
+            return repo_files[idx]
 
-        close_matches = difflib.get_close_matches(
-            normalized_candidate, normalized_repo_files, n=1, cutoff=0.6
-        )
-        if close_matches:
-            best_match_index = normalized_repo_files.index(close_matches[0])
-            print(f"[🔍 Fuzzy Relative Match] {repo_files[best_match_index]}")
-            return repo_files[best_match_index]
+        # ----------------- FUZZY MATCH ---------------------
+        close = difflib.get_close_matches(extracted_text.lower(), normalized_repo_files, n=1, cutoff=0.6)
+        if close:
+            match = next(f for f in repo_files if f.lower() == close[0])
+            print(f"[Fuzzy Match] {match}")
+            return match
 
-        print(f"[❌ No Match] '{relative_path_candidate}' not found in repo.")
+        # ----------------- NO MATCH FOUND ---------------------
+        print(f"[❌ No Match] '{extracted_text}' not found in repo.")
         return None
 
     except Exception as e:
-        print(f"[❌ Exception] {e}")
+        print(f"[❌ Exception in extract_file_path] {e}")
         return None
+
+
+# def extract_file_path(issue_body, repo_files):
+#     """Extracts file path from GitHub issue body. Supports absolute URL or relative path."""
+#     try:
+        
+#         response = llm_client.chat.completions.create(
+#             messages=[
+#                 {
+#                     "role": "system",
+#                     "content": (
+#                         "You are an AI that extracts file paths from GitHub issue descriptions. "
+#                         "Your task is to find and return the exact GitHub file path or relative file path mentioned. "
+#                         "Return only the path part, like 'src/main.py' or 'test/CMakeLists.txt'. If none found, reply 'not there'."
+#                     )
+#                 },
+#                 {
+#                     "role": "user",
+#                     "content": f"Extract file path (absolute or relative) from:\n\n{issue_body}"
+#                 }
+#             ],
+#             model="mixtral-8x7b-32768",
+#         )
+        
+#         extracted_text = response.choices[0].message.content.strip()
+#         print(f"[LLM Output] {extracted_text}")
+
+#         if not extracted_text or not repo_files:
+#             return None
+
+#         github_url_match = re.search(
+#             r"https://github\.com/[^/]+/[^/]+/blob/[^/]+/([^\s`'\"#)>\]]+)", extracted_text
+#         )
+#         if github_url_match:
+#             file_path = github_url_match.group(1).strip()
+#             normalized_file_path = file_path.lower().strip()
+#             normalized_repo_files = [f.lower().strip() for f in repo_files]
+
+#             if normalized_file_path in normalized_repo_files:
+#                 print(f"[✅ Absolute Path Match] {file_path}")
+#                 return file_path
+
+            
+#             close_matches = difflib.get_close_matches(
+#                 normalized_file_path, normalized_repo_files, n=1, cutoff=0.6
+#             )
+#             if close_matches:
+#                 best_match_index = normalized_repo_files.index(close_matches[0])
+#                 print(f"[🔍 Fuzzy Absolute Match] {repo_files[best_match_index]}")
+#                 return repo_files[best_match_index]
+
+       
+#         relative_path_candidate = extracted_text.strip()
+#         normalized_candidate = relative_path_candidate.lower()
+#         normalized_repo_files = [f.lower().strip() for f in repo_files]
+
+#         if normalized_candidate in normalized_repo_files:
+#             print(f"[✅ Relative Path Match] {relative_path_candidate}")
+#             return relative_path_candidate
+
+#         close_matches = difflib.get_close_matches(
+#             normalized_candidate, normalized_repo_files, n=1, cutoff=0.6
+#         )
+#         if close_matches:
+#             best_match_index = normalized_repo_files.index(close_matches[0])
+#             print(f"[🔍 Fuzzy Relative Match] {repo_files[best_match_index]}")
+#             return repo_files[best_match_index]
+
+#         print(f"[❌ No Match] '{relative_path_candidate}' not found in repo.")
+#         return None
+
+#     except Exception as e:
+#         print(f"[❌ Exception] {e}")
+#         return None
 
 
 
