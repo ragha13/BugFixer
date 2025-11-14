@@ -254,7 +254,8 @@ import requests
 
 def fetch_repo_files(owner, repo, branch):
     """Fetch all source files from the repo, handling pagination properly."""
-    url = f"https://api.github.com/repos/{owner}/{repo}/git/trees/{branch}?recursive=1"
+    # url = f"https://api.github.com/repos/{owner}/{repo}/git/trees/{branch}?recursive=1"
+    url = f"https://api.github.com/repos/{owner}/{repo}/git/trees/{ref}?recursive=1"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     response = requests.get(url, headers=headers)
 
